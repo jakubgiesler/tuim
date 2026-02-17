@@ -3,12 +3,11 @@ use std::{
     process::Command,
 };
 
-use heapless::{
-    String,
-    Vec,
-};
+use heapless::String;
 
-use crate::common;
+use crate::common::{
+    self,
+};
 
 pub fn run_man(on_file: &str) -> Option<std::string::String> {
     match Command::new("man").arg(on_file).output() {
@@ -21,13 +20,8 @@ pub fn count_files_in_directory(dir: &str) -> usize {
     fs::read_dir(dir).map(|e| e.flatten().count()).unwrap_or(0)
 }
 
-pub fn search_in_directory(
-    dir: &str,
-    filter: Option<&str>,
-    offset: usize,
-) -> Vec<String<{ common::STRING_SIZE }>, { common::BUFFER_SIZE }> {
+pub fn search_in_directory(dir: &str, filter: Option<&str>) -> Vec<String<{ common::STRING_SIZE }>> {
     let mut buffer = Vec::new();
-    let mut c = 0;
 
     if let Ok(es) = fs::read_dir(dir) {
         for e in es.flatten() {
@@ -38,20 +32,10 @@ pub fn search_in_directory(
                     }
                 }
 
-                if c < offset {
-                    c += 1;
+                let mut s: String<{ common::STRING_SIZE }> = String::new();
 
-                    continue;
-                }
-
-                if buffer.len() < buffer.capacity() {
-                    let mut s: String<{ common::STRING_SIZE }> = String::new();
-
-                    if s.push_str(&file_name).is_ok() {
-                        buffer.push(s).ok();
-                    }
-                } else {
-                    break;
+                if s.push_str(&file_name).is_ok() {
+                    buffer.push(s);
                 }
             }
         }

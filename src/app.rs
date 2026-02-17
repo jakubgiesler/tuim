@@ -48,6 +48,9 @@ impl App {
 
     pub fn handle_events(&mut self) -> io::Result<()> {
         match crossterm::event::read()? {
+            Event::Resize(_, _) => {
+                self.request_redraw();
+            },
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => match key_event.code {
                 KeyCode::Esc => self.set_flag(Self::SHOULD_CLOSE, true),
                 KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => self.set_flag(Self::SHOULD_CLOSE, true),
@@ -88,7 +91,7 @@ impl App {
         Ok(())
     }
 
-    pub fn draw(&self, frame: &mut Frame) {
+    pub fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
 
         crate::widgets::overlay::draw(frame, area);

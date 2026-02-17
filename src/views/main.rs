@@ -1,7 +1,4 @@
-use heapless::{
-    String,
-    Vec,
-};
+use heapless::String;
 use ratatui::{
     Frame,
     layout::{
@@ -32,25 +29,29 @@ pub struct Main {
     search_box: SearchBox<{ common::SEARCH_BOX_SIZE }>,
 
     selected: usize,
-    buffer: Vec<String<{ common::STRING_SIZE }>, { common::BUFFER_SIZE }>,
+    scroll_offset: usize,
+    buffer: Vec<String<{ common::STRING_SIZE }>>,
     len: usize,
 
     man_content: Option<std::string::String>,
+    visible_rows: usize,
 }
 
 impl Main {
     pub fn new() -> Self {
-        let buffer = util::fs::search_in_directory("/usr/bin", None, 0);
+        let buffer = util::fs::search_in_directory("/usr/bin", None);
         let len = util::fs::count_files_in_directory("/usr/bin");
 
         let mut m = Self {
             search_box: SearchBox::new(),
 
             selected: 0,
+            scroll_offset: 0,
             buffer,
             len,
 
             man_content: None,
+            visible_rows: 10,
         };
 
         m.update_man_content();
@@ -59,21 +60,21 @@ impl Main {
     }
 
     fn update_buffer(&mut self) {
-        self.buffer = util::fs::search_in_directory(
-            "/usr/bin",
-            {
-                if self.search_box.is_empty() {
-                    None
-                } else {
-                    Some(self.search_box.as_str())
-                }
-            },
-            0,
-        );
+        self.buffer = util::fs::search_in_directory("/usr/bin", {
+            if self.search_box.is_empty() {
+                None
+            } else {
+                Some(self.search_box.as_str())
+            }
+        });
     }
 
     fn update_man_content(&mut self) {
-        self.man_content = util::fs::run_man(&self.buffer[self.selected]);
+        if let Some(selected) = self.buffer.get(self.selected) {
+            self.man_content = util::fs::run_man(selected);
+        } else {
+            self.man_content = None;
+        }
     }
 
     #[must_use]
@@ -83,6 +84,12 @@ impl Main {
                 if self.search_box.pop().is_some() {
                     self.update_buffer();
 
+                    if self.selected >= self.buffer.len() {
+                        self.selected = self.buffer.len().saturating_sub(1);
+                    }
+
+                    self.update_man_content();
+
                     return true;
                 }
             },
@@ -90,17 +97,33 @@ impl Main {
                 if self.search_box.push(c).is_ok() {
                     self.update_buffer();
 
+                    if self.selected >= self.buffer.len() {
+                        self.selected = self.buffer.len().saturating_sub(1);
+                    }
+
+                    self.update_man_content();
+
                     return true;
                 }
             },
             Event::Down => {
-                self.selected = self.selected.saturating_add(1);
+                self.selected = (self.selected + 1).min(self.buffer.len().saturating_sub(1));
+
+                if self.selected >= self.scroll_offset + self.visible_rows {
+                    self.scroll_offset = self.selected - self.visible_rows;
+                }
+
                 self.update_man_content();
 
                 return true;
             },
             Event::Up => {
                 self.selected = self.selected.saturating_sub(1);
+
+                if self.selected < self.scroll_offset {
+                    self.scroll_offset = self.selected;
+                }
+
                 self.update_man_content();
 
                 return true;
@@ -110,7 +133,7 @@ impl Main {
         false
     }
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(vec![Constraint::Length(32), Constraint::Fill(0)])
@@ -124,7 +147,7 @@ impl Main {
                 .constraints(vec![Constraint::Length(3), Constraint::Fill(0)])
                 .split(bins_area);
 
-            widgets::window::draw(frame, bins_area, None, Some(format!("{}/{}", self.selected, self.len).as_str()));
+            widgets::window::draw(frame, bins_area, None, Some(format!("{}/{}", self.selected + 1, self.len).as_str()));
 
             self.search_box.draw(frame, bins_area_layout[0]);
 
@@ -132,12 +155,21 @@ impl Main {
                 .resize(Size::new(bins_area_layout[1].width - 2, 1))
                 .offset(Offset::new(1, 0));
 
-            for (index, result) in self.buffer.iter().enumerate() {
-                if index > (bins_area_layout[1].height as usize).saturating_sub(2) {
+            let limit = (bins_area_layout[1].height as usize).saturating_sub(2);
+
+            self.visible_rows = limit;
+
+            if self.buffer.len() < self.scroll_offset {
+                self.scroll_offset = self.buffer.len().saturating_sub(limit);
+            }
+
+            for (index, result) in self.buffer[self.scroll_offset..].iter().enumerate() {
+                if index > limit {
                     break;
                 }
 
-                widgets::result::draw(frame, area, result, index % 2 == 0, index == self.selected);
+                let absolute_index = self.scroll_offset + index;
+                widgets::result::draw(frame, area, result, index % 2 == 0, absolute_index == self.selected);
 
                 area = area.clone().offset(Offset::new(0, 1));
             }

@@ -10,7 +10,6 @@ pub type ShouldRedraw = bool;
 
 pub const SEARCH_BOX_SIZE: usize = 28;
 pub const STRING_SIZE: usize = 256;
-pub const BUFFER_SIZE: usize = 256;
 
 //
 
