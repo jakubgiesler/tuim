@@ -14,21 +14,34 @@ use ratatui::{
     },
 };
 
+use crate::{
+    common,
+    views::{
+        cmd::Cmd,
+        main::Main,
+    },
+};
+
 #[derive(Debug)]
 pub struct App {
+    main_view: Main,
+    cmd_view: Cmd,
+
     state: u8,
 }
 
 impl App {
-    const BACKSPACE_DOWN: u8 = 1 << 2;
+    const IN_CMD_VIEW: u8 = 1 << 2;
     const REDRAW: u8 = 1 << 1;
     const SHOULD_CLOSE: u8 = 1 << 0;
 
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
+            main_view: Main::new(),
+            cmd_view: Cmd::new(),
             // SHOULD CLOSE -------\
             // REDRAW -----------\ |
-            // BACKSPACE ------\ | |
+            // IN CMD ---------\ | |
             state: 0b__0_0_0_0_0_1_0,
         }
     }
@@ -38,21 +51,36 @@ impl App {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => match key_event.code {
                 KeyCode::Esc => self.set_flag(Self::SHOULD_CLOSE, true),
                 KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => self.set_flag(Self::SHOULD_CLOSE, true),
-                KeyCode::Backspace => self.set_flag(Self::BACKSPACE_DOWN, true),
                 _ => {
-                    // if let KeyCode::Char(c) = key_event.code {
-                    //     if c.is_ascii() {
-                    //         let _ = self.search_for.push(c);
-                    //     }
-                    // }
-                    //
-                    // self.request_redraw();
+                    #[allow(clippy::collapsible_if)]
+                    {
+                        if KeyCode::Down == key_event.code {
+                            if self.main_view.event(common::Event::Down) {
+                                self.request_redraw();
+                            }
+                        }
+
+                        if KeyCode::Up == key_event.code {
+                            if self.main_view.event(common::Event::Up) {
+                                self.request_redraw();
+                            }
+                        }
+
+                        if KeyCode::Backspace == key_event.code {
+                            if self.main_view.event(common::Event::Backspace) {
+                                self.request_redraw();
+                            }
+                        }
+
+                        if let KeyCode::Char(c) = key_event.code
+                            && c.is_ascii()
+                        {
+                            if self.main_view.event(common::Event::Character(c)) {
+                                self.request_redraw();
+                            }
+                        }
+                    }
                 },
-            },
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Release => {
-                if key_event.code == KeyCode::Backspace {
-                    self.set_flag(Self::BACKSPACE_DOWN, false);
-                }
             },
             _ => (),
         }
@@ -63,9 +91,19 @@ impl App {
     pub fn draw(&self, frame: &mut Frame) {
         let area = frame.area();
 
-        crate::widgets::window::draw(frame, area);
+        crate::widgets::overlay::draw(frame, area);
 
         let area = area.offset(Offset::new(1, 1)).resize(Size::new(area.width - 2, area.height - 2));
+
+        //
+
+        if self.get_flag(Self::IN_CMD_VIEW) {
+            self.cmd_view.draw(frame, area);
+
+            return;
+        }
+
+        self.main_view.draw(frame, area);
     }
 
     #[inline]

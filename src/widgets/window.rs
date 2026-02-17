@@ -1,5 +1,3 @@
-use std::sync::OnceLock;
-
 use ratatui::{
     Frame,
     layout::{
@@ -10,11 +8,6 @@ use ratatui::{
         Color,
         Stylize,
     },
-    text::{
-        Line,
-        Span,
-        Text,
-    },
     widgets::{
         Block,
         Borders,
@@ -22,56 +15,17 @@ use ratatui::{
     },
 };
 
-const VERSION: &str = concat!(" v", env!("CARGO_PKG_VERSION"), " ");
+pub fn draw(frame: &mut Frame, area: Rect, title: Option<&str>, footer: Option<&str>) {
+    let block = if let Some(title) = title {
+        Block::default().borders(Borders::ALL).fg(Color::DarkGray).title(title)
+    } else {
+        Block::default().borders(Borders::ALL).fg(Color::DarkGray)
+    };
 
-fn help() -> &'static Text<'static> {
-    static HELP: OnceLock<Text<'static>> = OnceLock::new();
+    frame.render_widget(block, area);
 
-    HELP.get_or_init(|| {
-        Text::from(vec![Line::from(vec![
-            Span::raw(" "),
-            Span::styled("Exit", Color::Red),
-            Span::raw(" • "),
-            Span::raw("esc/ctrl+c"),
-            Span::raw(" | "),
-            Span::styled("Navigate", Color::Cyan),
-            Span::raw(" • "),
-            Span::raw("↑/↓"),
-            Span::raw(" | "),
-            Span::styled("Run", Color::Green),
-            Span::raw(" • "),
-            Span::raw("enter"),
-            Span::raw(" "),
-        ])])
-    })
-}
-
-pub fn draw(frame: &mut Frame, area: Rect) {
-    {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .fg(Color::DarkGray)
-            .title(" TUI Menu ")
-            .title_style(Color::Yellow);
-
-        frame.render_widget(block, area);
-    }
-
-    {
-        let top_right = Paragraph::new(VERSION).alignment(Alignment::Right).italic();
-
-        let top_right_area = Rect {
-            x: area.x + 1,
-            y: area.y,
-            width: area.width - 2,
-            height: 1,
-        };
-
-        frame.render_widget(top_right, top_right_area);
-    }
-
-    {
-        let bottom_left = Paragraph::new(help().clone()).alignment(Alignment::Left);
+    if let Some(footer) = footer {
+        let bottom_left = Paragraph::new(" ".to_owned() + footer + " ").alignment(Alignment::Right);
 
         let bottom_left_area = Rect {
             x: area.x + 1,
