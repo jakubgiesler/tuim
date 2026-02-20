@@ -59,6 +59,8 @@ impl App {
                     } else {
                         self.set_flag(Self::IN_CMD_VIEW, false);
 
+                        self.cmd_view.reset_scroll();
+
                         self.request_redraw();
                     }
                 },

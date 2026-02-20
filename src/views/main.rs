@@ -157,7 +157,7 @@ impl Main {
                 .constraints(vec![Constraint::Length(3), Constraint::Fill(0)])
                 .split(bins_area);
 
-            widgets::window::draw(frame, bins_area, None, Some(format!("{}/{}", self.selected + 1, self.len).as_str()));
+            widgets::window::draw(frame, bins_area, None, Some(format!("Found {} binaries", self.len).as_str()));
 
             self.search_box.draw(frame, bins_area_layout[0]);
 

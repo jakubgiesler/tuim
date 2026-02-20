@@ -75,7 +75,7 @@ impl Cmd {
         false
     }
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect, man_content: Option<&str>) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect, man_content: Option<&str>) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(3), Constraint::Fill(1)])
@@ -93,12 +93,14 @@ impl Cmd {
 
         match &man_content {
             Some(content) if !content.is_empty() => {
-                let vl = content
-                    .lines()
-                    .skip(self.man_scroll)
-                    .take(man_area.height.into())
-                    .collect::<Vec<&str>>()
-                    .join("\n");
+                let h = man_area.height.into();
+                let lines = content.lines();
+
+                let ms = lines.clone().count().saturating_sub(h);
+
+                self.man_scroll = (self.man_scroll).min(ms);
+
+                let vl = lines.skip(self.man_scroll).take(h).collect::<Vec<&str>>().join("\n");
 
                 widgets::text::draw(frame, man_area, &vl, Some(Color::White));
             },
@@ -106,6 +108,10 @@ impl Cmd {
                 widgets::text::draw(frame, man_area, common::MAN_NOT_FOUND, Some(ratatui::style::Color::Red));
             },
         }
+    }
+
+    pub const fn reset_scroll(&mut self) {
+        self.man_scroll = 0;
     }
 
     pub fn is_empty(&self) -> bool {
